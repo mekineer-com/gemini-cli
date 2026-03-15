@@ -88,8 +88,19 @@ export function getModelPolicyChain(
       options.useCustomToolModel,
     );
     return [
-      definePolicy({ model: previewModel }),
-      definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+      definePolicy({
+        model: previewModel,
+        actions: SILENT_ACTIONS,
+      }),
+      definePolicy({
+        model: PREVIEW_GEMINI_FLASH_MODEL,
+        actions: SILENT_ACTIONS,
+      }),
+      definePolicy({
+        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        isLastResort: true,
+        actions: SILENT_ACTIONS,
+      }),
     ];
   }
 
