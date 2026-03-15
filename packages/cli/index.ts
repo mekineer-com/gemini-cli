@@ -7,6 +7,16 @@
  */
 
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+
+if (
+  process.platform === 'linux' &&
+  existsSync('/etc/alpine-release') &&
+  !process.env['GEMINI_CLI_NO_RELAUNCH'] &&
+  !process.env['GEMINI_CLI_FORCE_RELAUNCH']
+) {
+  process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+}
 
 const argv = process.argv.slice(2);
 if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
