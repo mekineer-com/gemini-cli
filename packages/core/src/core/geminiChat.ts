@@ -637,7 +637,10 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => handleFallback(this.context.config, lastModelToUse, authType, error);
+    ) =>
+      handleFallback(this.context.config, lastModelToUse, authType, error, {
+        forceSilent: role === LlmRole.SUBAGENT,
+      });
 
     const onValidationRequiredCallback = async (
       validationError: ValidationRequiredError,

@@ -27,6 +27,7 @@ export async function handleFallback(
   failedModel: string,
   authType?: string,
   error?: unknown,
+  options: { forceSilent?: boolean } = {},
 ): Promise<string | boolean | null> {
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
@@ -69,7 +70,7 @@ export async function handleFallback(
     // failureKind is already declared and calculated above
     const action = resolvePolicyAction(failureKind, selectedPolicy);
 
-    if (action === 'silent') {
+    if (action === 'silent' || options.forceSilent) {
       applyAvailabilityTransition(getAvailabilityContext, failureKind);
       return processIntent(config, 'retry_always', fallbackModel);
     }

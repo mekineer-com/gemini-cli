@@ -21,6 +21,7 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
@@ -138,6 +139,7 @@ describe('handleFallback', () => {
 
       expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
         DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
       ]);
     });
 
@@ -154,7 +156,7 @@ describe('handleFallback', () => {
 
       expect(policyHandler).toHaveBeenCalledWith(
         MOCK_PRO_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         undefined,
       );
     });
@@ -196,6 +198,26 @@ describe('handleFallback', () => {
       }
     });
 
+    it('forces silent fallback for subagents without invoking the UI handler', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+        undefined,
+        { forceSilent: true },
+      );
+
+      expect(result).toBe(true);
+      expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+    });
+
     it('does not wrap around to upgrade candidates if the current model was selected at the end (e.g. by router)', async () => {
       // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
       vi.mocked(policyConfig.getModel).mockReturnValue(
@@ -208,18 +230,17 @@ describe('handleFallback', () => {
       });
       policyHandler.mockResolvedValue('retry_once');
 
-      await handleFallback(
+      const result = await handleFallback(
         policyConfig,
         DEFAULT_GEMINI_FLASH_MODEL,
         AUTH_OAUTH,
       );
 
-      expect(availability.selectFirstAvailable).not.toHaveBeenCalled();
-      expect(policyHandler).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
-        undefined,
-      );
+      expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      ]);
+      expect(result).toBeNull();
+      expect(policyHandler).not.toHaveBeenCalled();
     });
 
     it('successfully follows expected availability response for Preview Chain', async () => {
@@ -244,6 +265,7 @@ describe('handleFallback', () => {
       expect(result).toBe(true);
       expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
         PREVIEW_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
       ]);
     });
 
@@ -352,7 +374,7 @@ describe('handleFallback', () => {
 
       const result = await handleFallback(
         policyConfig,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         AUTH_OAUTH,
       );
 
@@ -360,8 +382,8 @@ describe('handleFallback', () => {
 
       expect(result).not.toBeNull();
       expect(policyHandler).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         undefined,
       );
     });
