@@ -2139,7 +2139,7 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should stop recursing after one retry when InvalidStream events are repeatedly received', async () => {
+    it('should stop recursing after three retries when InvalidStream events are repeatedly received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
@@ -2172,16 +2172,16 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 3 events (model_info + original + 1 retry)
-      expect(events.length).toBe(3);
+      // We expect 5 events (model_info + original + 3 retries)
+      expect(events.length).toBe(5);
       expect(
         events
           .filter((e) => e.type === GeminiEventType.ModelInfo)
           .map((e) => e.value),
       ).toEqual(['gemini-2.0-flash']);
 
-      // Verify that turn.run was called twice
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+      // Verify that turn.run was called four times
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(4);
     });
 
     describe('Editor context delta', () => {

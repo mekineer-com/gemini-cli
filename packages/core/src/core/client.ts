@@ -577,7 +577,7 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     boundedTurns: number,
-    isInvalidStreamRetry: boolean,
+    invalidStreamRetryCount: number,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
@@ -794,7 +794,7 @@ export class GeminiClient {
         this.config.getContinueOnFailedApiCall() &&
         isGemini2Model(modelToUse)
       ) {
-        if (isInvalidStreamRetry) {
+        if (invalidStreamRetryCount >= 3) {
           logContentRetryFailure(
             this.config,
             new ContentRetryFailureEvent(
@@ -812,7 +812,7 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
-          true,
+          invalidStreamRetryCount + 1,
           displayContent,
         );
         return turn;
@@ -860,11 +860,11 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
-    isInvalidStreamRetry: boolean = false,
+    invalidStreamRetryCount: number = 0,
     displayContent?: PartListUnion,
     stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!isInvalidStreamRetry) {
+    if (invalidStreamRetryCount === 0) {
       this.config.resetTurn();
     }
 
@@ -918,7 +918,7 @@ export class GeminiClient {
         signal,
         prompt_id,
         boundedTurns,
-        isInvalidStreamRetry,
+        invalidStreamRetryCount,
         displayContent,
       );
 
@@ -1226,7 +1226,7 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     boundedTurns: number,
-    isInvalidStreamRetry: boolean,
+    invalidStreamRetryCount: number,
     displayContent?: PartListUnion,
     controllerToAbort?: AbortController,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
@@ -1251,7 +1251,7 @@ export class GeminiClient {
       signal,
       prompt_id,
       boundedTurns - 1,
-      isInvalidStreamRetry,
+      invalidStreamRetryCount,
       displayContent,
     );
   }
