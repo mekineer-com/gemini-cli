@@ -1994,11 +1994,11 @@ ${JSON.stringify(
       );
     });
 
-    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received for Gemini 2 models', async () => {
+    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
-      // Arrange - router must return a Gemini 2 model for retry to trigger
+      // Arrange
       mockRouterService.route.mockResolvedValue({
         model: 'gemini-2.0-flash',
         reason: 'test',
@@ -2097,7 +2097,7 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
+    it('should retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
@@ -2110,8 +2110,13 @@ ${JSON.stringify(
       const mockStream1 = (async function* () {
         yield { type: GeminiEventType.InvalidStream };
       })();
+      const mockStream2 = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Continued content' };
+      })();
 
-      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+      mockTurnRunFn
+        .mockReturnValueOnce(mockStream1)
+        .mockReturnValueOnce(mockStream2);
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
@@ -2133,17 +2138,24 @@ ${JSON.stringify(
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'gemini-3.0-pro' },
         { type: GeminiEventType.InvalidStream },
+        { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
-      // Verify that turn.run was called only once (no retry)
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+      expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+        2,
+        { model: 'gemini-3.0-pro', isChatModel: true },
+        [{ text: 'System: Please continue.' }],
+        expect.any(AbortSignal),
+        undefined,
+      );
     });
 
     it('should stop recursing after three retries when InvalidStream events are repeatedly received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
-      // Arrange - router must return a Gemini 2 model for retry to trigger
+      // Arrange
       mockRouterService.route.mockResolvedValue({
         model: 'gemini-2.0-flash',
         reason: 'test',
