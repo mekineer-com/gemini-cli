@@ -17,7 +17,6 @@ import {
   type ToolLiveOutput,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
@@ -185,7 +184,7 @@ export class ToolExecutor {
     const callId = call.request.callId;
     let outputFile: string | undefined;
 
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+    if (typeof content === 'string') {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {

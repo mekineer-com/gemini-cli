@@ -394,6 +394,63 @@ describe('ToolExecutor', () => {
     }
   });
 
+  it('should truncate large grep output', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+
+    const toolName = 'grep_search';
+    const mockTool = new MockTool({ name: toolName });
+    const invocation = mockTool.build({});
+    const longOutput = 'This is a very long grep output that should be truncated.';
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: longOutput,
+      returnDisplay: longOutput,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-grep-trunc',
+        name: toolName,
+        args: { pattern: 'digest_cursor' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-grep-trunc',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      toolName,
+      'call-grep-trunc',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      '/tmp/truncated_output.txt',
+      10,
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response).toEqual({ output: 'TruncatedContent...' });
+      expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
+    }
+  });
+
   it('should truncate large MCP tool output with single text Part', async () => {
     // 1. Setup Config for Truncation
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
