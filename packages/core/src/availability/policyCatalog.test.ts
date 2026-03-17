@@ -16,6 +16,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 
@@ -23,10 +24,11 @@ describe('policyCatalog', () => {
   it('returns preview chain when preview enabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: true });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_MODEL);
-    expect(chain).toHaveLength(4);
+    expect(chain).toHaveLength(5);
     expect(chain[1]?.model).toBe(DEFAULT_GEMINI_MODEL);
-    expect(chain[2]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(chain[2]?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(chain[4]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
   });
 
   it('returns Gemini 3.1 chain when useGemini31 is true', () => {
@@ -35,10 +37,11 @@ describe('policyCatalog', () => {
       useGemini31: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
-    expect(chain).toHaveLength(4);
+    expect(chain).toHaveLength(5);
     expect(chain[1]?.model).toBe(DEFAULT_GEMINI_MODEL);
-    expect(chain[2]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(chain[2]?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(chain[4]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
   });
 
   it('returns Gemini 3.1 Custom Tools chain when useGemini31 and useCustomToolModel are true', () => {
@@ -48,10 +51,11 @@ describe('policyCatalog', () => {
       useCustomToolModel: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
-    expect(chain).toHaveLength(4);
+    expect(chain).toHaveLength(5);
     expect(chain[1]?.model).toBe(DEFAULT_GEMINI_MODEL);
-    expect(chain[2]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(chain[2]?.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    expect(chain[3]?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(chain[4]?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
   });
 
   it('returns default chain when preview disabled', () => {
