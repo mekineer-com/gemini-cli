@@ -851,7 +851,7 @@ export class GeminiChat {
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
-    let hasToolCall = false;
+    let hasUsableToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
@@ -872,8 +872,8 @@ export class GeminiChat {
             hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
+          if ((chunk.functionCalls?.length ?? 0) > 0) {
+            hasUsableToolCall = true;
           }
 
           modelResponseParts.push(
@@ -940,7 +940,7 @@ export class GeminiChat {
     // Record model response text from the collected parts.
     // Also flush when there are thoughts or a tool call (even with no text)
     // so that BeforeTool hooks always see the latest transcript state.
-    if (responseText || hasThoughts || hasToolCall) {
+    if (responseText || hasThoughts || hasUsableToolCall) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
@@ -949,30 +949,31 @@ export class GeminiChat {
     }
 
     // Stream validation logic: A stream is considered successful if:
-    // 1. There's a tool call OR
-    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
+    // 1. There is at least one usable parsed tool call (`response.functionCalls`) OR
+    // 2. There is a finish reason and non-empty response text.
     //
-    // We throw an error only when there's no tool call AND:
+    // We throw an error when:
+    // - the model explicitly reports malformed/unexpected tool call, OR
+    // - there is no usable tool call AND:
     // - No finish reason, OR
-    // - MALFORMED_FUNCTION_CALL finish reason OR
     // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall) {
+    if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+      throw new InvalidStreamError(
+        'Model stream ended with malformed function call.',
+        'MALFORMED_FUNCTION_CALL',
+      );
+    }
+    if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+      throw new InvalidStreamError(
+        'Model stream ended with unexpected tool call.',
+        'UNEXPECTED_TOOL_CALL',
+      );
+    }
+    if (!hasUsableToolCall) {
       if (!finishReason) {
         throw new InvalidStreamError(
           'Model stream ended without a finish reason.',
           'NO_FINISH_REASON',
-        );
-      }
-      if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
-        throw new InvalidStreamError(
-          'Model stream ended with malformed function call.',
-          'MALFORMED_FUNCTION_CALL',
-        );
-      }
-      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
-        throw new InvalidStreamError(
-          'Model stream ended with unexpected tool call.',
-          'UNEXPECTED_TOOL_CALL',
         );
       }
       if (!responseText) {

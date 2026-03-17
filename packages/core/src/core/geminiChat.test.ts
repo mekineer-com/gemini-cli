@@ -904,6 +904,52 @@ describe('GeminiChat', () => {
       ).toBe(true);
     });
 
+    it('should throw InvalidStreamError when malformed tool-call parts exist without usable functionCalls', async () => {
+      const streamWithOrphanToolCallPart = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'run_shell_command',
+                      args: {
+                        command: 'ls -F ~/Nextcloud/',
+                      },
+                    },
+                  },
+                ],
+              },
+              finishReason: 'MALFORMED_FUNCTION_CALL',
+            },
+          ],
+          functionCalls: [],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithOrphanToolCallPart,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-pro-preview' },
+        'test malformed orphan tool call',
+        'prompt-id-orphan-toolcall',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
