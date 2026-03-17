@@ -790,18 +790,22 @@ export class GeminiClient {
 
     if (isInvalidStream) {
       if (this.config.getContinueOnFailedApiCall()) {
-        if (invalidStreamRetryCount >= 3) {
+        if (invalidStreamRetryCount >= 5) {
           logContentRetryFailure(
             this.config,
             new ContentRetryFailureEvent(
-              4,
+              6,
               'FAILED_AFTER_PROMPT_INJECTION',
               modelToUse,
             ),
           );
           return turn;
         }
-        const nextRequest = [{ text: 'System: Please continue.' }];
+        const nextRequest = [
+          {
+            text: 'System: Your previous response ended empty or malformed. Continue the same task without restarting, and if you use tools, emit a complete valid tool call.',
+          },
+        ];
         // Recursive call - update turn with result
         turn = yield* this.sendMessageStream(
           nextRequest,

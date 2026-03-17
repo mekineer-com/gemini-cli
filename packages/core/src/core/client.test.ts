@@ -1994,7 +1994,7 @@ ${JSON.stringify(
       );
     });
 
-    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
+    it('should recursively call sendMessageStream with the invalid-stream recovery prompt when InvalidStream event is received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
@@ -2050,11 +2050,15 @@ ${JSON.stringify(
         undefined,
       );
 
-      // Second call with "Please continue."
+      // Second call with the invalid-stream recovery prompt
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
         { model: 'gemini-2.0-flash', isChatModel: true },
-        [{ text: 'System: Please continue.' }],
+        [
+          {
+            text: 'System: Your previous response ended empty or malformed. Continue the same task without restarting, and if you use tools, emit a complete valid tool call.',
+          },
+        ],
         expect.any(AbortSignal),
         undefined,
       );
@@ -2097,7 +2101,7 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
+    it('should retry with the invalid-stream recovery prompt when InvalidStream event is received for non-Gemini-2 models', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
@@ -2145,13 +2149,17 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
         { model: 'gemini-3.0-pro', isChatModel: true },
-        [{ text: 'System: Please continue.' }],
+        [
+          {
+            text: 'System: Your previous response ended empty or malformed. Continue the same task without restarting, and if you use tools, emit a complete valid tool call.',
+          },
+        ],
         expect.any(AbortSignal),
         undefined,
       );
     });
 
-    it('should stop recursing after three retries when InvalidStream events are repeatedly received', async () => {
+    it('should stop recursing after five retries when InvalidStream events are repeatedly received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
@@ -2184,16 +2192,16 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 5 events (model_info + original + 3 retries)
-      expect(events.length).toBe(5);
+      // We expect 7 events (model_info + original + 5 retries)
+      expect(events.length).toBe(7);
       expect(
         events
           .filter((e) => e.type === GeminiEventType.ModelInfo)
           .map((e) => e.value),
       ).toEqual(['gemini-2.0-flash']);
 
-      // Verify that turn.run was called four times
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(4);
+      // Verify that turn.run was called six times
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(6);
     });
 
     describe('Editor context delta', () => {
