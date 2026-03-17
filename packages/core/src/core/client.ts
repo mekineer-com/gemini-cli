@@ -791,6 +791,29 @@ export class GeminiClient {
     if (isInvalidStream) {
       if (this.config.getContinueOnFailedApiCall()) {
         if (invalidStreamRetryCount >= 5) {
+          const didFallback = await handleFallback(
+            this.config,
+            modelToUse,
+            undefined,
+            new Error('Invalid stream retry limit reached.'),
+            { forceSilent: true },
+          );
+          if (didFallback) {
+            const nextRequest = [
+              {
+                text: 'System: Your previous response ended empty or malformed. Continue the same task without restarting, and if you use tools, emit a complete valid tool call.',
+              },
+            ];
+            turn = yield* this.sendMessageStream(
+              nextRequest,
+              signal,
+              prompt_id,
+              boundedTurns - 1,
+              0,
+              displayContent,
+            );
+            return turn;
+          }
           logContentRetryFailure(
             this.config,
             new ContentRetryFailureEvent(

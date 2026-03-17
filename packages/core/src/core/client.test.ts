@@ -53,6 +53,7 @@ import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import * as fallbackHandler from '../fallback/handler.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -118,6 +119,7 @@ vi.mock('../utils/getFolderStructure', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock Folder Structure'),
 }));
 vi.mock('../utils/errorReporting', () => ({ reportError: vi.fn() }));
+vi.mock('../fallback/handler.js', () => ({ handleFallback: vi.fn() }));
 vi.mock('../utils/nextSpeakerChecker', () => ({
   checkNextSpeaker: vi.fn().mockResolvedValue(null),
 }));
@@ -168,6 +170,7 @@ describe('Gemini Client (client.ts)', () => {
     vi.resetAllMocks();
     ClearcutLogger.clearInstance();
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
+    vi.mocked(fallbackHandler.handleFallback).mockResolvedValue(null);
 
     mockGenerateContentFn = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
@@ -2202,6 +2205,61 @@ ${JSON.stringify(
 
       // Verify that turn.run was called six times
       expect(mockTurnRunFn).toHaveBeenCalledTimes(6);
+    });
+
+    it('should silently fall back after invalid stream retry exhaustion and continue the turn', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemini-3-pro-preview',
+        reason: 'test',
+      });
+      vi.mocked(fallbackHandler.handleFallback).mockResolvedValue(true);
+
+      const invalidStream = async function* () {
+        yield { type: GeminiEventType.InvalidStream };
+      };
+      const recovered = async function* () {
+        yield { type: GeminiEventType.Content, value: 'Recovered content' };
+      };
+
+      mockTurnRunFn
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(invalidStream())
+        .mockReturnValueOnce(recovered());
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-fallback-invalid-stream',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toContainEqual({
+        type: GeminiEventType.Content,
+        value: 'Recovered content',
+      });
+      expect(vi.mocked(fallbackHandler.handleFallback)).toHaveBeenCalledWith(
+        client['config'],
+        expect.any(String),
+        undefined,
+        expect.any(Error),
+        { forceSilent: true },
+      );
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(7);
     });
 
     describe('Editor context delta', () => {
