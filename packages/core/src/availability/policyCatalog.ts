@@ -94,7 +94,11 @@ export function getModelPolicyChain(
         actions: SILENT_ACTIONS,
       }),
       definePolicy({
-        model: PREVIEW_GEMINI_FLASH_MODEL,
+        model: DEFAULT_GEMINI_MODEL,
+        actions: SILENT_ACTIONS,
+      }),
+      definePolicy({
+        model: DEFAULT_GEMINI_FLASH_MODEL,
         actions: SILENT_ACTIONS,
       }),
       definePolicy({

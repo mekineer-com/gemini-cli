@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyModelSelection } from './policyHelpers.js';
 import type { Config } from '../config/config.js';
 import {
+  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import { ModelAvailabilityService } from './modelAvailabilityService.js';
@@ -40,7 +40,7 @@ describe('Fallback Integration', () => {
 
   it('should select fallback model when primary model is terminal and config is in AUTO mode', () => {
     // 1. Simulate "Pro" failing with a terminal quota error
-    // The policy chain for PREVIEW_GEMINI_MODEL_AUTO is [PREVIEW_GEMINI_MODEL, PREVIEW_GEMINI_FLASH_MODEL]
+    // The policy chain for PREVIEW_GEMINI_MODEL_AUTO starts with PREVIEW_GEMINI_MODEL and falls back to stable models.
     availabilityService.markTerminal(PREVIEW_GEMINI_MODEL, 'quota');
 
     // 2. Request "Pro" explicitly (as Agent would)
@@ -52,13 +52,11 @@ describe('Fallback Integration', () => {
       isChatModel: true,
     });
 
-    // 4. Expect fallback to Flash
-    expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    // 4. Expect fallback to stable Pro
+    expect(result.model).toBe(DEFAULT_GEMINI_MODEL);
 
     // 5. Expect active model to be updated
-    expect(config.setActiveModel).toHaveBeenCalledWith(
-      PREVIEW_GEMINI_FLASH_MODEL,
-    );
+    expect(config.setActiveModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
   });
 
   it('should fallback for Gemini 3 models even if config is NOT in AUTO mode', () => {
@@ -74,7 +72,7 @@ describe('Fallback Integration', () => {
     // 4. Apply model selection
     const result = applyModelSelection(config, { model: requestedModel });
 
-    // 5. Expect it to fallback to Flash (because Gemini 3 uses PREVIEW_CHAIN)
-    expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    // 5. Expect it to fallback to stable Pro
+    expect(result.model).toBe(DEFAULT_GEMINI_MODEL);
   });
 });
