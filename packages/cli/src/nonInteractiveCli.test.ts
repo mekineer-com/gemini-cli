@@ -1521,6 +1521,46 @@ describe('runNonInteractive', () => {
         'Error: Original error\n    at test\n',
       );
     });
+
+    it('handles errors before unsubscribing UserFeedback', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.TEXT);
+
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.Error,
+          value: { error: new Error('boom') },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      const errors = await import('./utils/errors.js');
+      const handleErrorSpy = vi
+        .spyOn(errors, 'handleError')
+        .mockImplementation(() => {
+          throw new Error('handled');
+        });
+
+      await expect(
+        runNonInteractive({
+          config: mockConfig,
+          settings: mockSettings,
+          input: 'test',
+          prompt_id: 'prompt-id-error-order',
+        }),
+      ).rejects.toThrow('handled');
+
+      expect(handleErrorSpy).toHaveBeenCalled();
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.UserFeedback,
+        expect.any(Function),
+      );
+
+      const handleErrorOrder = handleErrorSpy.mock.invocationCallOrder[0];
+      const offOrder = mockCoreEvents.off.mock.invocationCallOrder.at(-1);
+      expect(handleErrorOrder).toBeLessThan(offOrder ?? Number.POSITIVE_INFINITY);
+    });
   });
 
   it('should emit appropriate events for streaming JSON output', async () => {

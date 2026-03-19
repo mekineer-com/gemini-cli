@@ -181,7 +181,6 @@ export async function runNonInteractive({
       }
     };
 
-    let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
 
@@ -518,17 +517,15 @@ export async function runNonInteractive({
         }
       }
     } catch (error) {
-      errorToHandle = error;
+      // Keep feedback listeners attached while formatting/outputting errors.
+      // Unsubscribing first can make JSON-mode failures exit silently.
+      handleError(error, config);
     } finally {
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-    }
-
-    if (errorToHandle) {
-      handleError(errorToHandle, config);
     }
   });
 }
