@@ -80,8 +80,8 @@ const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
  */
 function getSupportedTerminalData(
   terminal: SupportedTerminal,
-): TerminalData | null {
-  return TERMINAL_DATA[terminal] || null;
+): TerminalData {
+  return TERMINAL_DATA[terminal];
 }
 
 type Keybinding = {
@@ -401,9 +401,6 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
   }
 
   const terminalData = getSupportedTerminalData(terminal);
-  if (!terminalData) {
-    return false;
-  }
 
   const configDir = getVSCodeStyleConfigDir(terminalData.appName);
   if (!configDir) {
@@ -473,13 +470,6 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
   }
 
   const terminalData = getSupportedTerminalData(terminal);
-  if (!terminalData) {
-    return {
-      success: false,
-      message: `Terminal "${terminal}" is not supported yet.`,
-    };
-  }
-
   return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
 }
 
