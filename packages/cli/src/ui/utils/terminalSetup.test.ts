@@ -110,6 +110,23 @@ describe('terminalSetup', () => {
       const result = await terminalSetup();
       expect(result.message).toContain('VS Code');
     });
+
+    it('should detect from /proc parent process on linux before ps fallback', async () => {
+      mocks.platform.mockReturnValue('linux');
+      mocks.readFile.mockImplementation((filePath) => {
+        if (
+          typeof filePath === 'string' &&
+          filePath === `/proc/${process.ppid}/comm`
+        ) {
+          return Promise.resolve('code\n');
+        }
+        return Promise.reject(new Error('ENOENT'));
+      });
+
+      const result = await terminalSetup();
+      expect(result.message).toContain('VS Code');
+      expect(mocks.exec).not.toHaveBeenCalled();
+    });
   });
 
   describe('configureVSCodeStyle', () => {

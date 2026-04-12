@@ -150,24 +150,71 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
     return envTerminal;
   }
 
+  const detectFromParentName = (
+    parentName: string,
+  ): SupportedTerminal | null => {
+    // Check forks before VS Code to avoid false positives
+    if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
+      return 'windsurf';
+    if (
+      parentName.includes('antigravity') ||
+      parentName.includes('Antigravity')
+    )
+      return 'antigravity';
+    if (parentName.includes('cursor') || parentName.includes('Cursor'))
+      return 'cursor';
+    if (parentName.includes('code') || parentName.includes('Code'))
+      return 'vscode';
+    return null;
+  };
+
+  const readLinuxParentProcessName = async (): Promise<string | null> => {
+    const ppid = process.ppid;
+    if (!Number.isInteger(ppid) || ppid <= 1) {
+      return null;
+    }
+
+    try {
+      const comm = await fs.readFile(`/proc/${ppid}/comm`, 'utf8');
+      const trimmed = comm.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    } catch {
+      // Fall through to cmdline read.
+    }
+
+    try {
+      const cmdline = await fs.readFile(`/proc/${ppid}/cmdline`, 'utf8');
+      const normalized = cmdline.replace(/\0/g, ' ').trim();
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    } catch {
+      // Fall through to ps fallback.
+    }
+
+    return null;
+  };
+
   // Check parent process name
   if (os.platform() !== 'win32') {
     try {
-      const { stdout } = await execAsync('ps -o comm= -p $PPID');
-      const parentName = stdout.trim();
+      if (os.platform() === 'linux') {
+        const parentFromProc = await readLinuxParentProcessName();
+        if (parentFromProc) {
+          const detected = detectFromParentName(parentFromProc);
+          if (detected) {
+            return detected;
+          }
+        }
+      }
 
-      // Check forks before VS Code to avoid false positives
-      if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
-        return 'windsurf';
-      if (
-        parentName.includes('antigravity') ||
-        parentName.includes('Antigravity')
-      )
-        return 'antigravity';
-      if (parentName.includes('cursor') || parentName.includes('Cursor'))
-        return 'cursor';
-      if (parentName.includes('code') || parentName.includes('Code'))
-        return 'vscode';
+      const { stdout } = await execAsync(`ps -o comm= -p ${process.ppid}`);
+      const detected = detectFromParentName(stdout.trim());
+      if (detected) {
+        return detected;
+      }
     } catch (error) {
       // Continue detection even if process check fails
       debugLogger.debug('Parent process detection failed:', error);
