@@ -102,7 +102,7 @@ describe('terminalSetup', () => {
     });
 
     it('should detect from parent process', async () => {
-      mocks.platform.mockReturnValue('linux');
+      mocks.platform.mockReturnValue('darwin');
       mocks.exec.mockImplementation((cmd, cb) => {
         cb(null, { stdout: 'code\n' });
       });
@@ -125,6 +125,24 @@ describe('terminalSetup', () => {
 
       const result = await terminalSetup();
       expect(result.message).toContain('VS Code');
+      expect(mocks.exec).not.toHaveBeenCalled();
+    });
+
+    it('should not call ps fallback on linux when /proc parent is not a supported terminal', async () => {
+      mocks.platform.mockReturnValue('linux');
+      mocks.readFile.mockImplementation((filePath) => {
+        if (
+          typeof filePath === 'string' &&
+          filePath === `/proc/${process.ppid}/comm`
+        ) {
+          return Promise.resolve('bash\n');
+        }
+        return Promise.reject(new Error('ENOENT'));
+      });
+
+      const result = await terminalSetup();
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Could not detect terminal type');
       expect(mocks.exec).not.toHaveBeenCalled();
     });
   });

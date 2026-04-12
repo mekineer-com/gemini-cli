@@ -143,6 +143,15 @@ export function getTerminalProgram(): SupportedTerminal | null {
   return null;
 }
 
+function detectFromParentName(parentName: string): SupportedTerminal | null {
+  const normalized = parentName.toLowerCase();
+  if (normalized.includes('windsurf')) return 'windsurf';
+  if (normalized.includes('antigravity')) return 'antigravity';
+  if (normalized.includes('cursor')) return 'cursor';
+  if (normalized.includes('code')) return 'vscode';
+  return null;
+}
+
 // Terminal detection
 async function detectTerminal(): Promise<SupportedTerminal | null> {
   const envTerminal = getTerminalProgram();
@@ -150,25 +159,13 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
     return envTerminal;
   }
 
-  const detectFromParentName = (
-    parentName: string,
-  ): SupportedTerminal | null => {
-    // Check forks before VS Code to avoid false positives
-    if (parentName.includes('windsurf') || parentName.includes('Windsurf'))
-      return 'windsurf';
-    if (
-      parentName.includes('antigravity') ||
-      parentName.includes('Antigravity')
-    )
-      return 'antigravity';
-    if (parentName.includes('cursor') || parentName.includes('Cursor'))
-      return 'cursor';
-    if (parentName.includes('code') || parentName.includes('Code'))
-      return 'vscode';
+  const platform = os.platform();
+  if (platform === 'win32') {
     return null;
-  };
+  }
 
-  const readLinuxParentProcessName = async (): Promise<string | null> => {
+  // On Linux, prefer /proc lookup and avoid ps fallback to keep BusyBox-compatible.
+  if (platform === 'linux') {
     const ppid = process.ppid;
     if (!Number.isInteger(ppid) || ppid <= 1) {
       return null;
@@ -176,52 +173,21 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
 
     try {
       const comm = await fs.readFile(`/proc/${ppid}/comm`, 'utf8');
-      const trimmed = comm.trim();
-      if (trimmed.length > 0) {
-        return trimmed;
-      }
-    } catch {
-      // Fall through to cmdline read.
-    }
-
-    try {
-      const cmdline = await fs.readFile(`/proc/${ppid}/cmdline`, 'utf8');
-      const normalized = cmdline.replace(/\0/g, ' ').trim();
-      if (normalized.length > 0) {
-        return normalized;
-      }
-    } catch {
-      // Fall through to ps fallback.
-    }
-
-    return null;
-  };
-
-  // Check parent process name
-  if (os.platform() !== 'win32') {
-    try {
-      if (os.platform() === 'linux') {
-        const parentFromProc = await readLinuxParentProcessName();
-        if (parentFromProc) {
-          const detected = detectFromParentName(parentFromProc);
-          if (detected) {
-            return detected;
-          }
-        }
-      }
-
-      const { stdout } = await execAsync(`ps -o comm= -p ${process.ppid}`);
-      const detected = detectFromParentName(stdout.trim());
-      if (detected) {
-        return detected;
-      }
+      return detectFromParentName(comm.trim());
     } catch (error) {
-      // Continue detection even if process check fails
       debugLogger.debug('Parent process detection failed:', error);
+      return null;
     }
   }
 
-  return null;
+  // Non-Linux Unix fallback.
+  try {
+    const { stdout } = await execAsync(`ps -o comm= -p ${process.ppid}`);
+    return detectFromParentName(stdout.trim());
+  } catch (error) {
+    debugLogger.debug('Parent process detection failed:', error);
+    return null;
+  }
 }
 
 // Backup file helper
