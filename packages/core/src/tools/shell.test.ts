@@ -265,6 +265,11 @@ describe('ShellTool', () => {
       resolveExecutionPromise(fullResult);
     };
 
+    const buildWrappedCommand = (command: string, tempFilePath: string) =>
+      `exit() { return "\${1:-0}"; }\n` +
+      `{ ${command} }\n` +
+      `__code=$?; pgrep -P $$ >${tempFilePath} 2>&1; exit $__code;`;
+
     it('should wrap command on linux and parse pgrep output', async () => {
       const invocation = shellTool.build({ command: 'my-command &' });
       const promise = invocation.execute(mockAbortSignal);
@@ -276,7 +281,7 @@ describe('ShellTool', () => {
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = buildWrappedCommand('my-command &', tmpFile);
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
@@ -305,7 +310,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = buildWrappedCommand('ls;', tmpFile);
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
@@ -330,7 +335,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = buildWrappedCommand('ls;', tmpFile);
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
@@ -343,6 +348,34 @@ describe('ShellTool', () => {
           sandboxManager: expect.any(Object),
         }),
       );
+    });
+
+    it('should preserve exit code and capture background PIDs when command uses explicit exit', async () => {
+      const invocation = shellTool.build({ command: 'sleep 60 & exit 1' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ pid: 54321, output: '', exitCode: 1 });
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
+
+      const result = await promise;
+
+      const wrappedCommand = buildWrappedCommand('sleep 60 & exit 1;', tmpFile);
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
+      );
+      expect(result.llmContent).toContain('Background PIDs: 54322');
+      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
     it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
